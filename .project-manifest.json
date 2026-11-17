@@ -23,6 +23,16 @@
       "path": "internal/journal"
     },
     {
+      "id": "dispatch",
+      "name": "排队投影、选择策略与事务内领取复核",
+      "path": "internal/queue"
+    },
+    {
+      "id": "admission",
+      "name": "容量准入与冻结引用事务检查",
+      "path": "internal/admission"
+    },
+    {
       "id": "objects",
       "name": "内容寻址接收与产物提升",
       "path": "internal/blob"
@@ -443,11 +453,12 @@
       "snapshot_consistency"
     ],
     "evidence": {
-      "concurrency": "internal/service/worker.go:claim, completeLocked",
+      "concurrency": "internal/service/claim.go:claim, completeLocked",
       "recovery_rollback": "internal/journal/recovery.go:Recover",
       "time_semantics": "internal/timeline/plan.go:Build; internal/caption/map.go:Map",
       "idempotency": "internal/service/submit.go:Submit",
-      "snapshot_consistency": "internal/service/submit.go:Submit; internal/journal/store.go:Update"
+      "snapshot_consistency": "internal/service/submit.go:Submit; internal/journal/store.go:Update",
+      "capacity": "internal/admission/admission.go:EnsureCapacity; internal/service/submit.go:Submit"
     }
   }
 }

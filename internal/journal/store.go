@@ -61,6 +61,21 @@ func (s *Store) Snapshot() (domain.State, error) {
 	defer s.mu.Unlock()
 	return clone(s.state)
 }
+
+// Queued projects only the queued renders while holding the state lock. It
+// copies a bounded number of small entries instead of cloning the journal, so
+// dispatch selection never receives or duplicates the full history.
+func (s *Store) Queued() []domain.QueueEntry {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]domain.QueueEntry, 0)
+	for _, r := range s.state.Renders {
+		if r.State == "queued" {
+			out = append(out, domain.QueueEntry{ID: r.ID, CreatedAt: r.CreatedAt, QueuedAt: r.UpdatedAt})
+		}
+	}
+	return out
+}
 func (s *Store) Update(fn func(*domain.State) error) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

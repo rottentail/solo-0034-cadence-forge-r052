@@ -20,6 +20,16 @@ type Artifact struct {
 	CaptionFile string     `json:"caption_file"`
 	Inspection  Inspection `json:"inspection"`
 }
+
+// QueueEntry is the bounded projection of a queued render used for dispatch
+// selection and commit-time revalidation. It deliberately excludes sheets,
+// recipes, source snapshots, plans and attempt history.
+type QueueEntry struct {
+	ID        string
+	CreatedAt time.Time
+	QueuedAt  time.Time
+}
+
 type Render struct {
 	ID          string            `json:"id"`
 	Key         string            `json:"key"`

@@ -5,6 +5,7 @@ import (
 	"cadenceforge/internal/config"
 	"cadenceforge/internal/journal"
 	"cadenceforge/internal/media"
+	"cadenceforge/internal/queue"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -19,13 +20,24 @@ type Service struct {
 	Blobs    *blob.Store
 	Probe    media.Prober
 	Config   config.Config
+	selector queue.Selector
 	mutation sync.Mutex
 	wake     chan struct{}
 	activeMu sync.Mutex
 	active   map[string]context.CancelFunc
 }
 
+// New wires the service with the default FIFO selection strategy. Selector is
+// a dependency seam: replacing it swaps dispatch policy without granting the
+// strategy any write, lock or full-state access.
 func New(c config.Config) (*Service, error) {
+	return NewWithSelector(c, queue.FIFO{})
+}
+
+func NewWithSelector(c config.Config, selector queue.Selector) (*Service, error) {
+	if selector == nil {
+		selector = queue.FIFO{}
+	}
 	st, err := journal.Open(c.Root)
 	if err != nil {
 		return nil, err
@@ -35,7 +47,7 @@ func New(c config.Config) (*Service, error) {
 		st.Close()
 		return nil, err
 	}
-	s := &Service{Store: st, Blobs: blobs, Probe: media.Prober{Binary: c.FFprobe}, Config: c, wake: make(chan struct{}, 1), active: map[string]context.CancelFunc{}}
+	s := &Service{Store: st, Blobs: blobs, Probe: media.Prober{Binary: c.FFprobe}, Config: c, selector: selector, wake: make(chan struct{}, 1), active: map[string]context.CancelFunc{}}
 	if err = st.Recover(); err != nil {
 		st.Close()
 		return nil, err

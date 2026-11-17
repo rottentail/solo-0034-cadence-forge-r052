@@ -1,6 +1,7 @@
 package service
 
 import (
+	"cadenceforge/internal/admission"
 	"cadenceforge/internal/domain"
 	"time"
 )
@@ -57,14 +58,8 @@ func (s *Service) Retry(id string) (domain.Render, error) {
 		if len(r.Attempts) >= 3 {
 			return domain.Conflict("three-attempt limit reached")
 		}
-		pending := 0
-		for _, other := range st.Renders {
-			if other.State == "queued" || other.State == "running" {
-				pending++
-			}
-		}
-		if pending >= s.Config.QueueLimit {
-			return domain.Capacity("render queue is full")
+		if err := admission.EnsureCapacity(st, s.Config.QueueLimit); err != nil {
+			return err
 		}
 		r.State = "queued"
 		r.UpdatedAt = time.Now().UTC()

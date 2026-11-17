@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"sort"
 	"sync"
 	"time"
 )
@@ -53,45 +52,6 @@ func (s *Service) loop(ctx context.Context) {
 		case <-ticker.C:
 		}
 	}
-}
-func (s *Service) claim(cancel context.CancelFunc) (domain.Render, bool, error) {
-	s.mutation.Lock()
-	defer s.mutation.Unlock()
-	var out domain.Render
-	found := false
-	err := s.Store.Update(func(st *domain.State) error {
-		ids := []string{}
-		for id, r := range st.Renders {
-			if r.State == "queued" {
-				ids = append(ids, id)
-			}
-		}
-		sort.Slice(ids, func(i, j int) bool {
-			a, b := st.Renders[ids[i]], st.Renders[ids[j]]
-			if a.CreatedAt.Equal(b.CreatedAt) {
-				return ids[i] < ids[j]
-			}
-			return a.CreatedAt.Before(b.CreatedAt)
-		})
-		if len(ids) == 0 {
-			return nil
-		}
-		r := st.Renders[ids[0]]
-		r.State = "running"
-		r.UpdatedAt = time.Now().UTC()
-		r.Attempts = append(r.Attempts, domain.Attempt{Number: len(r.Attempts) + 1, StartedAt: r.UpdatedAt, Outcome: "running"})
-		st.Renders[r.ID] = r
-		st.Emit(r.ID, "render.started", fmt.Sprint(len(r.Attempts)))
-		out = r
-		found = true
-		return nil
-	})
-	if err == nil && found {
-		s.activeMu.Lock()
-		s.active[out.ID] = cancel
-		s.activeMu.Unlock()
-	}
-	return out, found && err == nil, err
 }
 func (s *Service) execute(ctx context.Context, r domain.Render) {
 	attempt := len(r.Attempts)

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"cadenceforge/internal/admission"
 	"cadenceforge/internal/caption"
 	"cadenceforge/internal/domain"
 	"cadenceforge/internal/timeline"
@@ -36,14 +37,8 @@ func (s *Service) Submit(key string, request Request) (domain.Render, error) {
 				return nil
 			}
 		}
-		pending := 0
-		for _, r := range st.Renders {
-			if r.State == "queued" || r.State == "running" {
-				pending++
-			}
-		}
-		if pending >= s.Config.QueueLimit {
-			return domain.Capacity("render queue is full")
+		if err := admission.EnsureCapacity(st, s.Config.QueueLimit); err != nil {
+			return err
 		}
 		sheets := st.Sheets[request.SheetID]
 		recipes := st.Recipes[request.RecipeID]

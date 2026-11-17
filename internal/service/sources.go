@@ -1,6 +1,7 @@
 package service
 
 import (
+	"cadenceforge/internal/admission"
 	"cadenceforge/internal/domain"
 	"cadenceforge/internal/inspect"
 	"cadenceforge/internal/media"
@@ -44,27 +45,8 @@ func (s *Service) RetireSource(id string) error {
 	s.mutation.Lock()
 	defer s.mutation.Unlock()
 	return s.Store.Update(func(st *domain.State) error {
-		if _, ok := st.Sources[id]; !ok {
-			return domain.Missing("source", id)
-		}
-		for _, versions := range st.Sheets {
-			for _, sheet := range versions {
-				for _, p := range sheet.Spans {
-					if p.SourceID == id {
-						return domain.Conflict("source is referenced by sheet history")
-					}
-				}
-				for _, cue := range sheet.Cues {
-					if cue.SourceID == id {
-						return domain.Conflict("source is referenced by cue history")
-					}
-				}
-			}
-		}
-		for _, r := range st.Renders {
-			if _, ok := r.Sources[id]; ok {
-				return domain.Conflict("source is retained by render lineage")
-			}
+		if err := admission.EnsureSourceUnreferenced(st, id); err != nil {
+			return err
 		}
 		delete(st.Sources, id)
 		st.Emit(id, "source.retired", "content retained for conservative reclamation")
